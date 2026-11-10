@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.sites-local/
+test-results/
+*.zip
+*.log
+public/materials/illustrated-course.html

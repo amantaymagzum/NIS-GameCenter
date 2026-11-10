@@ -1,0 +1,14 @@
+{
+  "name": "nis-gamecenter",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/server.mjs",
+    "build": "node tools/build.mjs",
+    "preview": "node tools/server.mjs dist",
+    "test": "node --test"
+  },
+  "description": "Учебный браузерный 2D-движок без внешних зависимостей",
+  "engines": { "node": ">=18" }
+}
