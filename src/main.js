@@ -1,3 +1,4 @@
+import {chapters,chapterLabel} from './chapters.js';
 import {exportGame} from './game-export.js';
 import {GameAudio} from './audio.js';
 const gameAudio=new GameAudio();
@@ -121,7 +122,7 @@ function renderBottom(){
   const messages=target.querySelector('.console-messages');messages.scrollTop=messages.scrollHeight;return;
  }
  if(bottomTab==='lessons'){
-  target.innerHTML=`<div class="course-bottom-summary"><span>7 класс · ${lessons.length} занятий по 45 минут</span><span>Пройдено ${completedLessons().length} / ${lessons.length}</span></div><div class="lesson-list">${lessons.map((l,i)=>`<button class="lesson-list-item ${i===lessonIndex?'current':''}" data-lesson="${i}"><span class="lesson-number">${project.completedLessons?.includes(i)?icon('check',15):String(i+1).padStart(2,'0')}</span><span><b>${l.title}</b><small>${l.module} · ${l.time}</small></span>${icon('chevron',13)}</button>`).join('')}</div>`;return;
+  target.innerHTML=`<div class="course-bottom-summary"><span>7 класс · ${lessons.length} занятий по 45 минут</span><span>Пройдено ${completedLessons().length} / ${lessons.length}</span></div><div class="lesson-list">${lessons.map((l,i)=>{const chapter=chapters.find(c=>c.start===i);return `${chapter?`<h3 class="lesson-list-chapter">${esc(chapterLabel(chapter))} <small>Уроки ${chapter.start+1}–${chapter.end}</small></h3>`:''}<button class="lesson-list-item ${i===lessonIndex?'current':''}" data-lesson="${i}"><span class="lesson-number">${project.completedLessons?.includes(i)?icon('check',15):String(i+1).padStart(2,'0')}</span><span><b>${l.title}</b><small>${l.module} · ${l.time}</small></span>${icon('chevron',13)}</button>`;}).join('')}</div>`;return;
  }
  const builtin=assetFilter==='scripts'?[]:palette;
  const assets=project.assets.filter(a=>assetFilter==='scripts'?a.type==='script':assetFilter==='sprites'?a.type==='image':true);

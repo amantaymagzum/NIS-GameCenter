@@ -13,7 +13,11 @@ try{
   await check('document.title.startsWith("NIS-GameCenter") && document.querySelector(".brand").textContent.includes("NIS-GameCenter")','name appears in browser title and header');
   await check('document.documentElement.scrollWidth <= innerWidth','new wordmark fits desktop toolbar');
   await click('[data-bottom="lessons"]');await check('document.querySelectorAll("[data-lesson]").length===16','ten lessons accessible from bottom panel');
-  await click('#lessons-open');await check('document.querySelectorAll("[data-course-lesson]").length===16','reader has full course navigation');
+  await click('#lessons-open');
+  await check('document.querySelectorAll(".course-chapter").length===2 && document.querySelectorAll(".course-chapter")[0].querySelectorAll("[data-course-lesson]").length===10 && document.querySelectorAll(".course-chapter")[1].querySelectorAll("[data-course-lesson]").length===6','reader groups old and new lessons in separate chapters');
+  await click('[data-course-lesson="10"]');
+  await check('document.querySelector(".chapter-intro").textContent.includes("Глава 2. Развитие и выпуск игры") && document.querySelector(".course-nav-item.current").dataset.courseLesson==="10"','lesson eleven opens chapter two without changing its saved index');
+  await click('[data-course-lesson="0"]');await check('document.querySelectorAll("[data-course-lesson]").length===16','reader has full course navigation');
   await check('document.querySelector(".learning-goals li") && document.querySelectorAll(".lesson-theory p").length>=3 && document.querySelectorAll(".lesson-steps li").length>=5','lesson includes goals, theory and practical steps');
   await click('.quiz-question summary');await check('document.querySelector(".quiz-question").open','self-check answer expands');
   await click('[data-course-lesson="2"]');await check('document.querySelector(".lesson-example-text").textContent.includes("export default class Player") && !!document.querySelector("#lesson-copy-code")','programming lesson shows complete code example');
