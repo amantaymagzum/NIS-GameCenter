@@ -9,7 +9,7 @@ try{
  await b.send('Runtime.enable');await b.send('Page.enable');await b.send('Network.enable');
  await b.send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
  await b.send('Page.navigate',{url:process.env.QA_BASE_URL||'http://127.0.0.1:5173/'});await b.wait('!!window.nisGameCenter');await click('#lessons-open');
- for(let i=0;i<10;i++){
+ for(let i=0;i<lessonVisuals.length;i++){
   await click(`[data-course-lesson="${i}"]`);
   await b.wait('document.querySelector(".lesson-illustration img").complete && document.querySelector(".lesson-illustration img").naturalWidth===960');
   await check('document.querySelectorAll(".theory-card").length===3 && ![...document.querySelectorAll(".theory-expanded")].some(d=>d.open)',`lesson ${i+1}: picture loaded and full theory initially folded`);
@@ -24,10 +24,10 @@ try{
  await check('document.documentElement.scrollWidth<=innerWidth && document.querySelector(".lesson-illustration").getBoundingClientRect().width <= document.querySelector(".lesson-article").clientWidth','illustrations fit mobile reader');
  shot=await b.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync('test-results/illustrated-mobile.png',Buffer.from(shot.data,'base64'));
  await b.send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
- const fileURL=new URL('../public/materials/illustrated-course.html',import.meta.url).href;
- await b.send('Network.emulateNetworkConditions',{offline:true,latency:0,downloadThroughput:-1,uploadThroughput:-1});
- await b.send('Page.navigate',{url:fileURL});await b.wait('document.querySelectorAll(".student-lesson").length===10 && [...document.images].every(i=>i.complete&&i.naturalWidth>0)');
- await check('document.images.length===10 && [...document.images].every(i=>i.src.startsWith("data:"))','downloaded illustrated course works offline with all ten embedded pictures');
+ const fileURL=new URL('./public/materials/illustrated-course.html',process.env.QA_BASE_URL||'http://127.0.0.1:5173/').href;
+ await b.send('Page.navigate',{url:fileURL});await b.wait('document.querySelectorAll(".student-lesson").length===16');
+ await b.send('Network.emulateNetworkConditions',{offline:true,latency:0,downloadThroughput:-1,uploadThroughput:-1});await b.wait('document.querySelectorAll(".student-lesson").length===16 && [...document.images].every(i=>i.complete&&i.naturalWidth>0)');
+ await check('document.images.length===16 && [...document.images].every(i=>i.src.startsWith("data:"))','downloaded illustrated course works offline with all ten embedded pictures');
  await b.send('Network.emulateNetworkConditions',{offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1});
  assert.deepEqual(b.events.filter(e=>e.method==='Runtime.exceptionThrown'),[],'no browser exceptions');checks++;console.log(`PASS ${checks} visual-learning browser checks`);
 }finally{b.close();}

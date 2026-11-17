@@ -34,7 +34,7 @@ export function lessonMarkup(index,completed,highlight) {
 }
 
 export function courseMarkdown(){
-  return '# NIS-GameCenter — курс разработки 2D-игр\n\n7 класс · 10 занятий по 45 минут. JavaScript и компонентная модель.\n\n'+lessons.map((l,i)=>{
+  return `# NIS-GameCenter — курс разработки 2D-игр\n\n7 класс · ${lessons.length} занятий по 45 минут. JavaScript и компонентная модель.\n\n`+lessons.map((l,i)=>{
     const code=l.code?`\n### Пример: ${l.code.name}\n\n${l.code.setup}\n\n\`\`\`javascript\n${l.code.source}\n\`\`\`\n\n${l.code.explanation}\n`:'';
     return `## Урок ${i+1}. ${l.title}\n\n${l.subtitle}\n\n### Цели\n\n${l.goals.map(g=>'- '+g).join('\n')}\n\n${l.theory.map(t=>`### ${t.title}\n\n${t.text}`).join('\n\n')}\n${code}\n### Практика\n\n${l.steps.map((s,n)=>`${n+1}. ${s}`).join('\n')}\n\n**Задание:** ${l.task}\n\n### Критерии результата\n\n${l.checks.map(c=>'- '+c).join('\n')}\n\n### Самопроверка\n\n${l.quiz.map(q=>`**${q.question}**\n\n${q.answer}`).join('\n\n')}\n\n**Дополнительное задание:** ${l.challenge}\n\n**Домашняя работа:** ${l.homework}\n`;
   }).join('\n---\n\n');
