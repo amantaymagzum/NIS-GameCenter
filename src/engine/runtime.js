@@ -10,13 +10,15 @@ export function compileScript(source, globals, filename='Script.js') {
 export class Runtime {
   constructor(project,emit=()=>{}) {
     this.project=structuredClone(project);this.emit=emit;this.world=new PhysicsWorld(project.scene.gravity);
-    this.objects=new Map();this.instances=[];this.keys=new Set();this.previousKeys=new Set();this.previousPairs=new Map();this.score=0;this.won=false;this.frame=0;
+    this.objects=new Map();this.instances=[];this.keys=new Set();this.previousKeys=new Set();this.previousPairs=new Map();this.score=0;this.won=false;this.lost=false;this.lives=null;this.message='';this.frame=0;
     for(const object of this.project.objects)if(object.active){this.objects.set(object.id,object);this.world.add(object);}
     const self=this;
-    this.scene={get score(){return self.score;},set score(v){self.score=Number(v)||0;},find:name=>self.find(name),findByTag:tag=>[...self.objects.values()].filter(o=>o.tag===tag).map(o=>self.api(o)),win:message=>{self.won=true;self.emit({type:'win',message:String(message||'Победа!')});}};
+    this.scene={get lives(){return self.lives;},set lives(v){if(!Number.isInteger(v)||v<0)throw new Error('Жизни: ожидается целое число от 0');self.lives=v;},get message(){return self.message;},set message(v){self.message=String(v).slice(0,200);},lose:message=>self.finish('lose',message||'Попробуй ещё раз'),get score(){return self.score;},set score(v){self.score=Number(v)||0;},find:name=>self.find(name),findByTag:tag=>[...self.objects.values()].filter(o=>o.tag===tag).map(o=>self.api(o)),win:message=>self.finish('win',message||'Победа!')};
     this.input={getAxis:name=>name==='Horizontal'?Number(this.isDown('ArrowRight','KeyD'))-Number(this.isDown('ArrowLeft','KeyA')):name==='Vertical'?Number(this.isDown('ArrowDown','KeyS'))-Number(this.isDown('ArrowUp','KeyW')):0,
       getKey:key=>this.keys.has(this.keyCode(key)),getKeyDown:key=>this.keys.has(this.keyCode(key))&&!this.previousKeys.has(this.keyCode(key))};
     this.debug={log:(...args)=>this.log('info',args),warn:(...args)=>this.log('warn',args),error:(...args)=>this.log('error',args)};
+    this.audio={tone:(frequency=440,duration=.15,volume=.1)=>{if(![frequency,duration,volume].every(Number.isFinite))throw new Error('Audio.tone: ожидаются числа');if(this.audioCount>=8)return;this.audioCount=(this.audioCount||0)+1;this.emit({type:'tone',frequency:Math.min(2000,Math.max(80,frequency)),duration:Math.min(1,Math.max(.02,duration)),volume:Math.min(.2,Math.max(0,volume))});}};
+    this.audioCount=0;
     const Script=class {
       get transform(){return this.gameObject.transform;}
       getComponent(name){return this.gameObject.getComponent(name);}
@@ -26,12 +28,13 @@ export class Runtime {
       const asset=this.project.assets.find(a=>a.id===object.script.assetId&&a.type==='script');
       if(!asset){this.log('error',[`Не найден скрипт: ${object.name}`]);continue;}
       try{
-        const Class=compileScript(asset.code,{Script,Input:this.input,Debug:this.debug,Scene:this.scene,Vector2:class {constructor(x=0,y=0){this.x=x;this.y=y;}}},asset.name);
+        const Class=compileScript(asset.code,{Script,Input:this.input,Debug:this.debug,Scene:this.scene,Audio:this.audio,Vector2:class {constructor(x=0,y=0){this.x=x;this.y=y;}}},asset.name);
         const instance=new Class();instance.gameObject=this.api(object);this.instances.push({instance,objectId:object.id,filename:asset.name,disabled:false});
       }catch(error){this.scriptError(error,asset.name);}
     }
     for(const entry of this.instances)this.call(entry,'start');
   }
+  finish(type,message){if(this.won||this.lost)return;this.won=type==='win';this.lost=type==='lose';this.emit({type,message:String(message).slice(0,200)});}
   keyCode(key){if(key.length===1)return key===' '?'Space':`Key${key.toUpperCase()}`;return key;}
   isDown(...codes){return codes.some(c=>this.keys.has(c));}
   find(name){const o=[...this.objects.values()].find(o=>o.name===name||o.id===name);return o?this.api(o):null;}
@@ -58,8 +61,10 @@ export class Runtime {
     Object.defineProperty(o,'_api',{value:api});return api;
   }
   tick(dt=1/60){
-    if(this.won)return this.snapshot();
-    for(const entry of this.instances){this.call(entry,'update',dt);this.call(entry,'fixedUpdate',dt);}
+    if(this.won||this.lost)return this.snapshot();
+    this.audioCount=0;
+    for(const entry of this.instances){if(this.won||this.lost)break;this.call(entry,'update',dt);if(!this.won&&!this.lost)this.call(entry,'fixedUpdate',dt);}
+    if(this.won||this.lost)return this.snapshot();
     const pairs=this.world.step(dt);
     for(const [key,pair]of pairs)if(!this.previousPairs.has(key))this.event(pair,pair.trigger?'onTriggerEnter':'onCollisionEnter');
     for(const [key,pair]of this.previousPairs)if(!pairs.has(key))this.event(pair,pair.trigger?'onTriggerExit':'onCollisionExit');
@@ -67,13 +72,14 @@ export class Runtime {
     return this.snapshot();
   }
   event(pair,name){
+    if(this.won||this.lost)return;
     for(const [id,otherId]of [[pair.a,pair.b],[pair.b,pair.a]]){
       const other=this.objects.get(otherId);if(!other)continue;
       for(const entry of this.instances)if(entry.objectId===id)this.call(entry,name,this.api(other));
     }
   }
   snapshot(){
-    return {type:'frame',frame:this.frame,score:this.score,won:this.won,objects:[...this.objects.values()].map(o=>{
+    return {type:'frame',frame:this.frame,score:this.score,won:this.won,lost:this.lost,lives:this.lives,message:this.message,objects:[...this.objects.values()].map(o=>{
       const b=this.world.bodies.get(o.id),p=b?position(b):o.transform;
       return {id:o.id,name:o.name,tag:o.tag,transform:{...o.transform,x:p.x,y:p.y,rotation:b?b.angle*180/Math.PI:o.transform.rotation},sprite:o.sprite,camera:o.camera};
     })};

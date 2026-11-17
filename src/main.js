@@ -1,3 +1,6 @@
+import {exportGame} from './game-export.js';
+import {GameAudio} from './audio.js';
+const gameAudio=new GameAudio();
 import {createDemo,createEmpty,makeObject,componentDefaults,clone,uid,validateProject,History,STORAGE_KEY,emptyCode} from './model.js';
 import {Viewport,palette,thumbnail} from './render.js';
 import {icon} from './icons.js';
@@ -21,7 +24,7 @@ root.innerHTML=`
   <a class="brand nis-brand" href="./" aria-label="NIS-GameCenter — мастерская игр"><span class="brand-mark">N</span><span class="brand-name"><span class="brand-nis">NIS</span><span class="brand-game">-GameCenter</span></span></a>
   <span class="top-divider"></span><button id="project-menu" class="project-title" aria-haspopup="true"><span id="project-name"></span>${icon('down',13)}</button>
   <div class="save-state" id="save-state"><span class="status-dot"></span>Сохранено</div>
-  <div class="top-actions"><button class="quiet-button" id="lessons-open">${icon('book')}<span>Учебник</span></button><button class="quiet-button" id="api-open" title="Справка по коду">${icon('code')}<span>Справка</span></button><span class="top-divider"></span><button class="download-button" id="download">${icon('download')}<span>Скачать проект</span></button></div>
+  <div class="top-actions"><button class="quiet-button" id="lessons-open">${icon('book')}<span>Учебник</span></button><button class="quiet-button" id="api-open" title="Справка по коду">${icon('code')}<span>Справка</span></button><button class="quiet-button" id="export-game">${icon("play")}<span>Экспорт игры</span></button><button class="quiet-button" id="mute-audio" aria-pressed="false">Звук: вкл.</button><span class="top-divider"></span><button class="download-button" id="download">${icon('download')}<span>Скачать проект</span></button></div>
  </header>
  <div class="workspace-bar">
   <div class="workspace-label"><span class="tiny-square"></span>МАСТЕРСКАЯ ИГР <span class="slash">/</span><span class="muted">2D</span></div>
@@ -40,13 +43,13 @@ root.innerHTML=`
   <section class="center-column">
    <div class="main-tabs"><button class="main-tab active" id="tab-scene">${icon('scene',15)}Сцена<span class="tab-dot"></span></button><button class="main-tab" id="tab-code">${icon('code',15)}Код<span class="js-badge">JS</span></button><div class="tab-spacer"></div><span id="mode-label">РЕЖИМ РЕДАКТИРОВАНИЯ</span></div>
    <div class="stage-toolbar" id="stage-toolbar"><div class="tool-group"><button class="icon-button active" title="Перемещайте объекты мышью">${icon('move',16)}</button><span class="tool-divider"></span><button id="grid" class="icon-button active" title="Показать / скрыть сетку" aria-pressed="true">${icon('grid',15)}</button><button id="snap" class="icon-button active" title="Привязка к сетке 8 px" aria-pressed="true">${icon('magnet',15)}</button><button id="colliders" class="icon-button" title="Показать коллайдеры" aria-pressed="false">${icon('collider',15)}</button></div><span class="scene-breadcrumb">${icon('scene',12)}<span>Уровень 01</span></span><div class="tool-group"><button id="fit" class="icon-button" title="Уместить сцену (F)">${icon('target',15)}</button><button id="zoom" class="zoom-button" title="Сбросить масштаб">100% ${icon('down',10)}</button><span class="dimension-label">960 × 540</span></div></div>
-   <div class="stage" id="stage"><canvas id="scene-canvas" tabindex="0" aria-label="Редактор сцены. Выберите объект и перетащите мышью."></canvas><span class="world-label"><i></i><span id="world-label">SCENE VIEW</span></span><div class="stage-empty" id="stage-empty" hidden><strong>Здесь начинается твоя игра</strong><span>Перетащи объект из библиотеки на сцену</span></div><div class="game-hud" id="game-hud" hidden><span class="coin-icon">◈</span><b id="score">0</b><span>/ 3</span></div><div id="game-message" class="game-message" hidden></div><div id="game-instructions" class="game-instructions" hidden>← → / A D <span>движение</span><kbd>Пробел</kbd><span>прыжок</span></div></div>
+   <div class="stage" id="stage"><canvas id="scene-canvas" tabindex="0" aria-label="Редактор сцены. Выберите объект и перетащите мышью."></canvas><span class="world-label"><i></i><span id="world-label">SCENE VIEW</span></span><div class="stage-empty" id="stage-empty" hidden><strong>Здесь начинается твоя игра</strong><span>Перетащи объект из библиотеки на сцену</span></div><div class="game-hud" id="game-hud" hidden><span class="coin-icon">◈</span><b id="score">0</b><span id="lives"></span></div><div id="game-hint" class="game-hint" role="status" hidden></div><div id="game-message" class="game-message" hidden></div><div id="game-instructions" class="game-instructions" hidden>← → / A D <span>движение</span><kbd>Пробел</kbd><span>прыжок</span></div></div>
    <div class="code-workspace" id="code-workspace" hidden><div class="code-toolbar"><select id="script-select" aria-label="Текущий скрипт"></select><span>${icon('circle',8)} JavaScript</span><span class="code-apply">Изменения применятся при запуске</span></div><div class="code-editor"><div id="line-numbers" class="line-numbers">1</div><div class="code-scroll"><pre id="code-highlight" aria-hidden="true"></pre><textarea id="code-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Редактор JavaScript"></textarea></div></div><div class="code-status"><span id="code-location">Строка 1, столбец 1</span><span>JavaScript · UTF-8 · 2 пробела</span></div></div>
    <div class="bottom-panel"><div class="bottom-tabs"><button data-bottom="assets" class="bottom-tab active">${icon('folder',14)}Ресурсы</button><button data-bottom="console" class="bottom-tab">${icon('terminal',14)}Консоль<span id="log-count" class="count">0</span><i id="error-dot" hidden></i></button><button data-bottom="lessons" class="bottom-tab">${icon('book',14)}Уроки<span class="count">${lessons.length}</span></button><div class="tab-spacer"></div><span class="bottom-note" id="bottom-note">Всё, что нужно для первой игры</span></div><div id="bottom-content" class="bottom-content"></div></div>
   </section>
   <aside class="inspector panel"><div class="panel-title"><span>Инспектор</span>${icon('settings',14)}</div><div id="inspector-content" class="inspector-content"></div></aside>
  </main>
- <footer class="statusbar"><span><i class="status-dot"></i><span id="footer-status">Готов к твоим идеям</span></span><span id="footer-hint">Перетаскивай объекты · Колесо — масштаб · F — вся сцена</span><span><span id="pointer-position">X 0 · Y 0</span><span class="footer-version">NIS-GameCenter 0.2</span></span></footer>
+ <footer class="statusbar"><span><i class="status-dot"></i><span id="footer-status">Готов к твоим идеям</span></span><span id="footer-hint">Перетаскивай объекты · Колесо — масштаб · F — вся сцена</span><span><span id="pointer-position">X 0 · Y 0</span><span class="footer-version">NIS-GameCenter 0.3</span></span></footer>
 </div><div id="popover" class="popover" hidden></div><div id="modal-root"></div><div id="toast" class="toast" role="status" hidden></div><input id="project-file" type="file" accept=".json,application/json" hidden/><input id="image-file" type="file" accept="image/png,image/jpeg,image/webp" hidden/>`;
 
 const viewport=new Viewport($('#scene-canvas'),{
@@ -165,7 +168,7 @@ function showLesson(index=lessonIndex){
  $('#lesson-back').onclick=()=>showLesson(index-1);
  $('#lesson-try').onclick=()=>{closeModal();setTab(l.practiceTab);};
  $('#lesson-print').onclick=()=>window.print();
- $('#course-download').onclick=()=>{const url=URL.createObjectURL(new Blob([courseMarkdown()],{type:'text/markdown;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='NIS-GameCenter-10-lessons.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);toast('Материалы всех 10 уроков скачаны.');};
+ $('#course-download').onclick=()=>{const url=URL.createObjectURL(new Blob([courseMarkdown()],{type:'text/markdown;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`NIS-GameCenter-${lessons.length}-lessons.md`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);toast(`Материалы всех ${lessons.length} уроков скачаны.`);};
  if(l.code)$('#lesson-copy-code').onclick=async()=>{
   try{
    if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(l.code.source);
@@ -176,23 +179,30 @@ function showLesson(index=lessonIndex){
  $('#lesson-done').onclick=()=>{
   project.completedLessons=[...new Set([...completedLessons(),index])];saveLocal();renderCourseProgress();renderBottom();
   if(index<lessons.length-1)showLesson(index+1);
-  else{closeModal();toast(project.completedLessons.length===lessons.length?'Все 10 уроков пройдены. Время создавать свою игру!':`Урок отмечен. Пройдено ${project.completedLessons.length} из ${lessons.length}.`);}
+  else{closeModal();toast(project.completedLessons.length===lessons.length?`Все ${lessons.length} уроков пройдены. Время выпускать свою игру!`:`Урок отмечен. Пройдено ${project.completedLessons.length} из ${lessons.length}.`);}
  };
 }
 
+async function downloadGame(){
+ try{const html=await exportGame(clone(project));const url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=project.name.replace(/[\\/:*?"<>|]/g,'_')+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);toast('HTML-игра скачана. Откройте файл в браузере; редактор и интернет не нужны.');}
+ catch(error){toast('Экспорт не удался: '+error.message);}
+}
+$('#export-game').onclick=downloadGame;
+$('#mute-audio').onclick=e=>{gameAudio.muted=!gameAudio.muted;if(gameAudio.muted)gameAudio.stop();e.currentTarget.textContent=gameAudio.muted?'Звук: выкл.':'Звук: вкл.';e.currentTarget.setAttribute('aria-pressed',String(gameAudio.muted));};
 function play(){
- if(playing){stop();return;}saveLocal();setTab('scene');closePopup();playing=true;paused=false;lastHeartbeat=performance.now();keys.clear();$('#game-message').hidden=true;
+ if(playing){stop();return;}gameAudio.unlock();saveLocal();setTab('scene');closePopup();playing=true;paused=false;lastHeartbeat=performance.now();keys.clear();$('#game-message').hidden=true;
  worker=new Worker(new URL('./engine/worker.js',import.meta.url),{type:'module'});
  worker.onmessage=e=>{lastHeartbeat=performance.now();const m=e.data;
-  if(m.type==='frame'){viewport.runtime=m;viewport.time=m.frame/60;viewport.draw();$('#score').textContent=m.score;}
+  if(m.type==='frame'){viewport.runtime=m;viewport.time=m.frame/60;viewport.draw();$('#score').textContent=m.score;$('#lives').textContent=m.lives===null?'':` · Жизни: ${m.lives}`;$('#game-hint').textContent=m.message;$('#game-hint').hidden=!m.message;}
   if(m.type==='log'){addLog(m.level,m.message);if(m.level==='error'){bottomTab='console';renderBottom();}}
-  if(m.type==='win'){$('#game-message').innerHTML=`<span class="victory-icon">${icon('flag',28)}</span><h2>${esc(m.message)}</h2><p>Твоя игра работает. А что изменишь дальше?</p><button id="play-again" class="primary-button">${icon('reset',15)}Ещё раз</button>`;$('#game-message').hidden=false;$('#play-again').onclick=()=>{stop();play();};}
+  if(m.type==='tone')gameAudio.play(m);
+  if(m.type==='win'||m.type==='lose'){$('#game-message').innerHTML=`<span class="victory-icon">${icon('flag',28)}</span><h2>${esc(m.message)}</h2><p>${m.type==='win'?'Цель достигнута.':'Можно попробовать ещё раз.'}</p><button id="play-again" class="primary-button">${icon('reset',15)}Ещё раз</button>`;$('#game-message').hidden=false;$('#play-again').onclick=()=>{stop();play();};}
   if(m.type==='fatal'){addLog('error',m.message);stop();bottomTab='console';renderBottom();}
  };
  worker.onerror=e=>{addLog('error',`Не удалось запустить игру: ${e.message}`);stop();bottomTab='console';renderBottom();};
  worker.postMessage({type:'start',project:clone(project)});updateTransport();$('#scene-canvas').focus();
 }
-function stop(){worker?.terminate();worker=null;playing=false;paused=false;keys.clear();viewport.runtime=null;$('#game-message').hidden=true;$('#score').textContent='0';updateTransport();viewport.draw();}
+function stop(){gameAudio.stop();$('#game-hint').hidden=true;worker?.terminate();worker=null;playing=false;paused=false;keys.clear();viewport.runtime=null;$('#game-message').hidden=true;$('#score').textContent='0';updateTransport();viewport.draw();}
 function updateTransport(){
  for(const id of ['add-object','upload-image','new-script']){const button=document.getElementById(id);if(button)button.disabled=playing;}
  document.querySelectorAll('[data-add]').forEach(button=>button.disabled=playing);
@@ -262,7 +272,7 @@ $('#image-file').onchange=async e=>{
  const file=e.target.files[0];e.target.value='';if(!file||playing)return;if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>4*1024*1024){toast('Выберите PNG, JPEG или WebP до 4 МБ.');return;}
  const reader=new FileReader();reader.onload=()=>{if(!markHistory())return;project.assets.push({id:uid(),type:'image',name:file.name,data:reader.result});renderBottom();renderInspector();changed();toast('Изображение добавлено. Нажмите на него, чтобы создать спрайт.');};reader.readAsDataURL(file);
 };
-$('#play').onclick=play;$('#pause').onclick=()=>{paused=!paused;worker?.postMessage({type:'pause',paused});updateTransport();};$('#step').onclick=()=>worker?.postMessage({type:'step'});
+$('#play').onclick=play;$('#pause').onclick=()=>{paused=!paused;if(paused)gameAudio.stop();worker?.postMessage({type:'pause',paused});updateTransport();};$('#step').onclick=()=>worker?.postMessage({type:'step'});
 $('#download').onclick=download;$('#undo').onclick=()=>undo();$('#redo').onclick=()=>undo(true);$('#scene-settings').onclick=()=>{selected=null;renderHierarchy();renderInspector();viewport.set(project,selected);};
 $('#fit').onclick=()=>viewport.fit();$('#zoom').onclick=()=>viewport.fit();
 for(const key of ['grid','snap','colliders'])$('#'+key).onclick=()=>{viewport[key]=!viewport[key];$('#'+key).classList.toggle('active',viewport[key]);$('#'+key).setAttribute('aria-pressed',viewport[key]);viewport.draw();};

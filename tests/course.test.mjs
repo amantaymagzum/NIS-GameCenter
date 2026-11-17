@@ -14,7 +14,7 @@ function exampleRuntime(index,kind='player'){
 test('projects preserve lesson 10 and completed course across JSON export/import',()=>{
   const p=createDemo();p.lesson=9;p.completedLessons=Array.from({length:10},(_,i)=>i);
   const restored=validateProject(JSON.parse(JSON.stringify(p)));assert.equal(restored.lesson,9);assert.equal(restored.completedLessons.length,10);
-  p.lesson=10;assert.throws(()=>validateProject(p),/урока/);p.lesson=0;p.completedLessons=[10];assert.throws(()=>validateProject(p),/уроков/);
+  p.lesson=LESSON_COUNT;assert.throws(()=>validateProject(p),/урока/);p.lesson=0;p.completedLessons=[LESSON_COUNT];assert.throws(()=>validateProject(p),/уроков/);
 });
 test('old five-lesson progress and existing project content remain unchanged',()=>{
   const p=createDemo();p.lesson=4;p.completedLessons=[0,1,2,3,4];p.name='Старый проект';
@@ -41,7 +41,7 @@ test('lesson 9 missing component produces a useful warning instead of an excepti
   const {runtime:r,events}=exampleRuntime(8,'sprite');r.tick();assert.ok(events.some(e=>e.level==='warn'&&e.message.includes('нет Rigidbody2D')));assert.ok(!events.some(e=>e.level==='error'));
 });
 test('downloaded student course includes complete source code and final project criteria',()=>{
-  const markdown=courseMarkdown();assert.equal(LESSON_COUNT,10);assert.ok(markdown.startsWith('# NIS-GameCenter'));
+  const markdown=courseMarkdown();assert.equal(LESSON_COUNT,16);assert.ok(markdown.startsWith('# NIS-GameCenter'));
   for(const lesson of lessons){assert.ok(markdown.includes(lesson.task));if(lesson.code)assert.ok(markdown.includes(lesson.code.source));}
   assert.ok(markdown.includes(lessons.at(-1).checks.at(-1)));
   assert.ok(!markdown.includes('undefined'));

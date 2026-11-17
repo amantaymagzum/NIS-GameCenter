@@ -13,5 +13,7 @@ fs.mkdirSync(output,{recursive:true});
 for(const file of ['index.html','src','public'])fs.cpSync(file,path.join(output,file),{recursive:true});
 fs.writeFileSync(path.join(output,'.nojekyll'),'');
 fs.mkdirSync('dist/materials',{recursive:true});
+fs.writeFileSync('dist/materials/course.md',courseMarkdown(),'utf8');
+// Keep the old download URL valid.
 fs.writeFileSync('dist/materials/10-lessons.md',courseMarkdown(),'utf8');
 console.log('Сборка готова: dist/');

@@ -1,3 +1,4 @@
+import {nextLessons} from './course-next.js';
 // The first five topics retain their original positions to preserve saved progress.
 export const lessons = [
   {
@@ -272,5 +273,7 @@ export const lessons = [
     homework:'Напишите короткую рефлексию: что получилось, что было сложно и что вы улучшили бы в следующей версии.',
   }
 ];
+
+lessons.push(...nextLessons);
 
 export const LESSON_COUNT = lessons.length;
