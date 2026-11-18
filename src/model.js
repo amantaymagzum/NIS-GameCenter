@@ -1,3 +1,4 @@
+import {validateRig} from './rig.js';
 import {LESSON_COUNT} from './course.js';
 export const VERSION = 1;
 export const STORAGE_KEY = 'kadr-project-v1';
@@ -109,6 +110,7 @@ export function validateProject(value) {
     if(o.rigidbody && (!['dynamic','static'].includes(o.rigidbody.type)||!finite(o.rigidbody.mass,0.01,10000)||!finite(o.rigidbody.gravityScale,-100,100)||!finite(o.rigidbody.restitution,0,1)||!finite(o.rigidbody.friction,0,1))) fail('Некорректный Rigidbody2D.');
     if(o.collider && (!['box','circle'].includes(o.collider.type)||!finite(o.collider.width,1,4096)||!finite(o.collider.height,1,4096)||!finite(o.collider.radius,1,2048)||!finite(o.collider.offsetX)||!finite(o.collider.offsetY))) fail('Некорректный Collider2D.');
     if(o.script && (typeof o.script.assetId!=='string'||typeof o.script.enabled!=='boolean')) fail('Некорректный Script.');
+    if(o.rig!==undefined&&o.rig!==null)validateRig(o.rig);
     if(o.camera && (!finite(o.camera.zoom,0.1,5)||typeof o.camera.followTarget!=='string'||!/^#[\da-f]{6}$/i.test(o.camera.background))) fail('Некорректная Camera2D.');
   }
   const assetIds=new Set();

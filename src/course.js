@@ -1,3 +1,4 @@
+import {animationLessons} from './course-animation.js';
 import {nextLessons} from './course-next.js';
 // The first five topics retain their original positions to preserve saved progress.
 export const lessons = [
@@ -274,6 +275,6 @@ export const lessons = [
   }
 ];
 
-lessons.push(...nextLessons);
+lessons.push(...nextLessons,...animationLessons);
 
 export const LESSON_COUNT = lessons.length;
