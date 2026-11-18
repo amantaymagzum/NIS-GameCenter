@@ -1,3 +1,4 @@
+import {rigEditorMarkup,mountRigEditor} from './rig-editor.js';
 import {chapters,chapterLabel} from './chapters.js';
 import {exportGame} from './game-export.js';
 import {GameAudio} from './audio.js';
@@ -16,6 +17,7 @@ try{const saved=localStorage.getItem(STORAGE_KEY);if(saved)project=validateProje
 let selected=project.objects.find(o=>o.tag==='Player')?.id||project.objects[0]?.id||null;
 let activeTab='scene',bottomTab='assets',assetFilter='all',activeScript=project.assets.find(a=>a.type==='script')?.id;
 let worker=null,playing=false,paused=false,lastHeartbeat=0,keys=new Set(),saveTimer,toastTimer,codeGroupTimer,codeEditing=false,search='',lessonIndex=project.lesson||0;
+let modalCleanup=null;
 const history=new History(),logs=[];
 const root=$('#root');
 
@@ -25,7 +27,7 @@ root.innerHTML=`
   <a class="brand nis-brand" href="./" aria-label="NIS-GameCenter — мастерская игр"><span class="brand-mark">N</span><span class="brand-name"><span class="brand-nis">NIS</span><span class="brand-game">-GameCenter</span></span></a>
   <span class="top-divider"></span><button id="project-menu" class="project-title" aria-haspopup="true"><span id="project-name"></span>${icon('down',13)}</button>
   <div class="save-state" id="save-state"><span class="status-dot"></span>Сохранено</div>
-  <div class="top-actions"><button class="quiet-button" id="lessons-open">${icon('book')}<span>Учебник</span></button><button class="quiet-button" id="api-open" title="Справка по коду">${icon('code')}<span>Справка</span></button><button class="quiet-button" id="export-game">${icon("play")}<span>Экспорт игры</span></button><button class="quiet-button" id="mute-audio" aria-pressed="false">Звук: вкл.</button><span class="top-divider"></span><button class="download-button" id="download">${icon('download')}<span>Скачать проект</span></button></div>
+  <div class="top-actions"><button class="quiet-button" id="lessons-open">${icon('book')}<span>Учебник</span></button><button class="quiet-button" id="api-open" title="Справка по коду">${icon('code')}<span>Справка</span></button><button class="quiet-button" id="export-game">${icon("play")}<span>Экспорт игры</span></button><button class="quiet-button" id="effects-toggle">Эффекты: вкл.</button><button class="quiet-button" id="mute-audio" aria-pressed="false">Звук: вкл.</button><span class="top-divider"></span><button class="download-button" id="download">${icon('download')}<span>Скачать проект</span></button></div>
  </header>
  <div class="workspace-bar">
   <div class="workspace-label"><span class="tiny-square"></span>МАСТЕРСКАЯ ИГР <span class="slash">/</span><span class="muted">2D</span></div>
@@ -50,7 +52,7 @@ root.innerHTML=`
   </section>
   <aside class="inspector panel"><div class="panel-title"><span>Инспектор</span>${icon('settings',14)}</div><div id="inspector-content" class="inspector-content"></div></aside>
  </main>
- <footer class="statusbar"><span><i class="status-dot"></i><span id="footer-status">Готов к твоим идеям</span></span><span id="footer-hint">Перетаскивай объекты · Колесо — масштаб · F — вся сцена</span><span><span id="pointer-position">X 0 · Y 0</span><span class="footer-version">NIS-GameCenter 0.3</span></span></footer>
+ <footer class="statusbar"><span><i class="status-dot"></i><span id="footer-status">Готов к твоим идеям</span></span><span id="footer-hint">Перетаскивай объекты · Колесо — масштаб · F — вся сцена</span><span><span id="pointer-position">X 0 · Y 0</span><span class="footer-version">NIS-GameCenter 0.4</span></span></footer>
 </div><div id="popover" class="popover" hidden></div><div id="modal-root"></div><div id="toast" class="toast" role="status" hidden></div><input id="project-file" type="file" accept=".json,application/json" hidden/><input id="image-file" type="file" accept="image/png,image/jpeg,image/webp" hidden/>`;
 
 const viewport=new Viewport($('#scene-canvas'),{
@@ -100,12 +102,14 @@ function field(label,path,value,options={}){
  return `<label class="field ${type==='checkbox'?'checkbox-field':''}"><span>${esc(label)}</span>${input}</label>`;
 }
 function pair(label,a,b){return `<div class="vector-field"><span>${label}</span><div>${a}${b||''}</div></div>`;}
-function section(name,type,body,help){return `<details class="component" open><summary><span>${icon('down',11)}<i class="component-icon ${type}">${icon({transform:'move',sprite:'image',rigidbody:'physics',collider:'collider',script:'code',camera:'camera'}[type],15)}</i><strong>${name}</strong></span>${type!=='transform'?`<button type="button" class="remove-component" data-remove="${type}" title="Удалить компонент" aria-label="Удалить ${name}">${icon('close',12)}</button>`:''}</summary><div class="component-body">${body}${help?`<p class="component-help">${help}</p>`:''}</div></details>`;}
+function section(name,type,body,help){return `<details class="component" open><summary><span>${icon('down',11)}<i class="component-icon ${type}">${icon({transform:'move',sprite:'image',rigidbody:'physics',collider:'collider',script:'code',camera:'camera',rig:'move'}[type],15)}</i><strong>${name}</strong></span>${type!=='transform'?`<button type="button" class="remove-component" data-remove="${type}" title="Удалить компонент" aria-label="Удалить ${name}">${icon('close',12)}</button>`:''}</summary><div class="component-body">${body}${help?`<p class="component-help">${help}</p>`:''}</div></details>`;}
 function renderInspector(){
  const o=currentObject(),target=$('#inspector-content');
  if(!o){target.innerHTML=`<div class="scene-info-header">${icon('scene',25)}<div><h2>Настройки сцены</h2><span>Общие параметры игры</span></div></div><fieldset ${playing?'disabled':''} class="scene-fields">${field('Название','scene.name',project.scene.name,{type:'text'})}${field('Ширина','scene.width',project.scene.width,{min:100,max:4096})}${field('Высота','scene.height',project.scene.height,{min:100,max:4096})}${field('Гравитация','scene.gravity',project.scene.gravity,{min:-10000,max:10000,step:10})}${field('Цвет фона','scene.background',project.scene.background,{type:'color'})}<p class="component-help">Пиксели и секунды. Ось Y направлена вниз. Нажмите на объект, чтобы увидеть его компоненты.</p></fieldset>`;return;}
  let body=section('Transform','transform',pair('Позиция',field('X','transform.x',o.transform.x),field('Y','transform.y',o.transform.y))+field('Поворот °','transform.rotation',o.transform.rotation)+pair('Масштаб',field('X','transform.scaleX',o.transform.scaleX,{step:.1}),field('Y','transform.scaleY',o.transform.scaleY,{step:.1})));
  if(o.sprite){const s=o.sprite;body+=section('Sprite Renderer','sprite',field('Спрайт','sprite.kind',s.kind,{choices:palette.filter(p=>p.kind!=='camera').map(p=>[p.kind,p.name])})+field('Изображение','sprite.assetId',s.assetId||'',{choices:[['','Встроенный спрайт'],...project.assets.filter(a=>a.type==='image').map(a=>[a.id,a.name])]})+field('Цвет','sprite.color',s.color,{type:'color'})+pair('Размер',field('W','sprite.width',s.width,{min:1,max:4096}),field('H','sprite.height',s.height,{min:1,max:4096}))+field('Слой','sprite.layer',s.layer,{min:-1000,max:1000})+field('Видимый','sprite.visible',s.visible,{type:'checkbox'}));}
+ if(o.rig)body+=section('Animator · кости','rig',`<p class="component-help">${o.rig.bones.length} костей · ${o.rig.clips.length} клипов</p><button id="edit-animation" type="button" class="script-edit-button">${icon('move',14)}Кости и анимация</button>`);
+ else if(!o.camera)body+=`<button id="edit-animation" type="button" class="add-component">${icon('move',14)}Добавить анимацию · кости</button>`;
  if(o.rigidbody){const r=o.rigidbody;body+=section('Rigidbody 2D','rigidbody',field('Тип тела','rigidbody.type',r.type,{choices:[['dynamic','Dynamic — подвижный'],['static','Static — неподвижный']]})+field('Масса','rigidbody.mass',r.mass,{min:.01,max:10000,step:.1})+field('Гравитация ×','rigidbody.gravityScale',r.gravityScale,{min:-100,max:100,step:.1})+field('Упругость','rigidbody.restitution',r.restitution,{min:0,max:1,step:.05})+field('Трение','rigidbody.friction',r.friction,{min:0,max:1,step:.05})+field('Без вращения','rigidbody.freezeRotation',r.freezeRotation,{type:'checkbox'}),!o.collider?'Добавьте Collider, чтобы тело участвовало в физике.':'Гравитация, скорость и взаимодействие с другими телами.');}
  if(o.collider){const c=o.collider;body+=section(c.type==='box'?'Box Collider 2D':'Circle Collider 2D','collider',field('Форма','collider.type',c.type,{choices:[['box','Прямоугольник'],['circle','Окружность']]})+(c.type==='box'?pair('Размер',field('W','collider.width',c.width,{min:1,max:4096}),field('H','collider.height',c.height,{min:1,max:4096})):field('Радиус','collider.radius',c.radius,{min:1,max:2048}))+pair('Смещение',field('X','collider.offsetX',c.offsetX),field('Y','collider.offsetY',c.offsetY))+field('Триггер','collider.isTrigger',c.isTrigger,{type:'checkbox'}),c.isTrigger?'Обнаруживает касание, но не останавливает объект.':'Форма столкновения не зависит от изображения.');}
  if(o.script){body+=section('Script','script',field('Файл','script.assetId',o.script.assetId,{choices:project.assets.filter(a=>a.type==='script').map(a=>[a.id,a.name])})+field('Включён','script.enabled',o.script.enabled,{type:'checkbox'})+`<button type="button" id="edit-script" class="script-edit-button">${icon('code',14)}Открыть код${icon('external',12)}</button>`);}
@@ -151,8 +155,12 @@ function download(){saveLocal();const blob=new Blob([JSON.stringify(project,null
 function replaceProject(next){stop();project=next;history.clear();selected=project.objects.find(o=>o.tag==='Player')?.id||project.objects[0]?.id||null;activeScript=project.assets.find(a=>a.type==='script')?.id;lessonIndex=project.lesson||0;viewport.fit();renderAll();changed();closeModal();}
 function popup(anchor,html){const p=$('#popover');p.innerHTML=html;p.hidden=false;const r=anchor.getBoundingClientRect();p.style.top=`${Math.min(r.bottom+5,innerHeight-340)}px`;p.style.left=`${Math.max(8,Math.min(r.left,innerWidth-270))}px`;}
 function closePopup(){$('#popover').hidden=true;}
-function modal(title,html,wide=false){$('#modal-root').innerHTML=`<div class="modal-backdrop"><section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><div><span class="modal-eyebrow">NIS-GAMECENTER / МАСТЕРСКАЯ ИГР</span><h2>${esc(title)}</h2></div><button id="modal-close" class="icon-button" aria-label="Закрыть">${icon('close',20)}</button></header><div class="modal-content">${html}</div></section></div>`;$('#modal-close').onclick=closeModal;$('.modal-backdrop').onclick=e=>{if(e.target===e.currentTarget)closeModal();};$('#modal-close').focus();}
-function closeModal(){$('#modal-root').innerHTML='';}
+function modal(title,html,wide=false){modalCleanup?.();modalCleanup=null;$('#modal-root').innerHTML=`<div class="modal-backdrop"><section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><div><span class="modal-eyebrow">NIS-GAMECENTER / МАСТЕРСКАЯ ИГР</span><h2>${esc(title)}</h2></div><button id="modal-close" class="icon-button" aria-label="Закрыть">${icon('close',20)}</button></header><div class="modal-content">${html}</div></section></div>`;$('#modal-close').onclick=closeModal;$('.modal-backdrop').onclick=e=>{if(e.target===e.currentTarget)closeModal();};$('#modal-close').focus();}
+function closeModal(){modalCleanup?.();modalCleanup=null;$('#modal-root').innerHTML='';}
+function openAnimationEditor(){
+ if(playing||!currentObject())return;const object=currentObject();modal('Анимация · '+object.name,rigEditorMarkup(),true);$('.modal').classList.add('rig-modal');
+ modalCleanup=mountRigEditor($('.rig-editor'),object,rig=>{if(markHistory()){object.rig=rig;closeModal();renderAll();changed();toast('Анимация сохранена. Запусти игру, чтобы увидеть её на сцене.');}},closeModal,project.assets.find(a=>a.id===object.sprite?.assetId&&a.type==='image')?.data);
+}
 function confirmReplace(next){modal('Начать заново?',`<p>Текущий проект будет заменён. Скачайте его, если хотите сохранить отдельную копию.</p><div class="modal-actions"><button id="backup" class="secondary-button">Скачать текущий</button><button id="confirm-replace" class="primary-button">Открыть ${next==='demo'?'учебный пример':'пустой проект'}</button></div>`);$('#backup').onclick=download;$('#confirm-replace').onclick=()=>replaceProject(next==='demo'?createDemo():createEmpty());}
 function showLesson(index=lessonIndex){
  index=Number.isFinite(index)?Math.max(0,Math.min(lessons.length-1,Math.trunc(index))):0;lessonIndex=index;project.lesson=index;saveLocal();renderCourseProgress();if(bottomTab==='lessons')renderBottom();const l=lessons[index];
@@ -189,6 +197,7 @@ async function downloadGame(){
  catch(error){toast('Экспорт не удался: '+error.message);}
 }
 $('#export-game').onclick=downloadGame;
+$('#effects-toggle').onclick=e=>{viewport.effectsEnabled=!viewport.effectsEnabled;e.currentTarget.textContent=viewport.effectsEnabled?'Эффекты: вкл.':'Эффекты: выкл.';viewport.draw();};
 $('#mute-audio').onclick=e=>{gameAudio.muted=!gameAudio.muted;if(gameAudio.muted)gameAudio.stop();e.currentTarget.textContent=gameAudio.muted?'Звук: выкл.':'Звук: вкл.';e.currentTarget.setAttribute('aria-pressed',String(gameAudio.muted));};
 function play(){
  if(playing){stop();return;}gameAudio.unlock();saveLocal();setTab('scene');closePopup();playing=true;paused=false;lastHeartbeat=performance.now();keys.clear();$('#game-message').hidden=true;
@@ -244,6 +253,7 @@ $('#inspector-content').onchange=e=>{
  renderAll();changed();
 };
 $('#inspector-content').onclick=e=>{
+ if(e.target.closest('#edit-animation')){openAnimationEditor();return;}
  const remove=e.target.closest('[data-remove]');if(remove){e.preventDefault();if(markHistory()){currentObject()[remove.dataset.remove]=null;renderAll();changed();}return;}
  if(e.target.closest('#duplicate'))duplicate();if(e.target.closest('#delete-object'))deleteObject();if(e.target.closest('#edit-script'))openScript(currentObject().script.assetId);
  const add=e.target.closest('#add-component');if(add){e.stopPropagation();const o=currentObject(),names={sprite:'Sprite Renderer',rigidbody:'Rigidbody 2D',collider:'Collider 2D',script:'Script',camera:'Camera 2D'};popup(add,`<span class="popover-label">КОМПОНЕНТЫ</span>${Object.entries(names).filter(([k])=>!o[k]).map(([k,v])=>`<button data-component="${k}">${icon(k==='script'?'code':'plus')}<span>${v}</span></button>`).join('')||'<p class="popover-empty">Все компоненты уже добавлены.</p>'}`);}
@@ -279,6 +289,7 @@ $('#fit').onclick=()=>viewport.fit();$('#zoom').onclick=()=>viewport.fit();
 for(const key of ['grid','snap','colliders'])$('#'+key).onclick=()=>{viewport[key]=!viewport[key];$('#'+key).classList.toggle('active',viewport[key]);$('#'+key).setAttribute('aria-pressed',viewport[key]);viewport.draw();};
 $('#api-open').onclick=()=>modal('Справка по JavaScript',`<div class="api-document">${apiDoc}</div>`,true);$('#lessons-open').onclick=()=>showLesson();$('#lesson-card').onclick=()=>showLesson();
 window.addEventListener('keydown',e=>{
+ if($('.rig-modal')&&e.key!=='Escape'){if(e.key==='F5')e.preventDefault();return;}
  if(e.key==='F5'){e.preventDefault();play();return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveLocal();toast('Сохранено в этом браузере. Для переноса скачайте проект.');return;}
  if(e.key==='Escape'){closePopup();closeModal();if(playing)stop();return;}
  const typing=e.target.closest('input,textarea,select,[contenteditable]');if(typing)return;

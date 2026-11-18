@@ -1,3 +1,4 @@
+import {drawRig,rigPose} from './rig.js';
 const TAU=Math.PI*2;
 export const palette=[{kind:'player',name:'Игрок',note:'Движение и прыжок',color:'#f6a664'},{kind:'platform',name:'Платформа',note:'Поверхность',color:'#9ccf91'},{kind:'coin',name:'Монетка',note:'Триггер',color:'#c1a2ff'},{kind:'crate',name:'Ящик',note:'Физический объект',color:'#d1a278'},{kind:'circle',name:'Мяч',note:'Круглый коллайдер',color:'#85c9d8'},{kind:'flag',name:'Финиш',note:'Конец уровня',color:'#c5ed8a'},{kind:'sprite',name:'Спрайт',note:'Пустой объект',color:'#b8b0fa'},{kind:'camera',name:'Камера',note:'Область просмотра',color:'#afbdd1'}];
 export function drawSprite(ctx,s,time=0,images=new Map()) {
@@ -43,7 +44,7 @@ export function thumbnail(kind,color) {
 
 export class Viewport {
   constructor(canvas,callbacks){
-    this.canvas=canvas;this.ctx=canvas.getContext('2d');this.callbacks=callbacks;this.zoom=1;this.pan={x:0,y:0};this.grid=true;this.colliders=false;this.snap=true;this.images=new Map();this.pointer=null;this.runtime=null;this.time=0;
+    this.canvas=canvas;this.ctx=canvas.getContext('2d');this.callbacks=callbacks;this.zoom=1;this.pan={x:0,y:0};this.effectsEnabled=true;this.grid=true;this.colliders=false;this.snap=true;this.images=new Map();this.pointer=null;this.runtime=null;this.time=0;
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(canvas.parentElement);
     canvas.addEventListener('pointerdown',e=>this.down(e));canvas.addEventListener('pointermove',e=>this.move(e));canvas.addEventListener('pointerup',e=>this.up(e));canvas.addEventListener('pointercancel',e=>this.up(e));
     canvas.addEventListener('wheel',e=>{if(this.runtime)return;e.preventDefault();this.zoom=Math.min(3,Math.max(.25,this.zoom*(e.deltaY>0?.9:1.1)));this.draw();callbacks.onZoom?.(this.zoom);},{passive:false});
@@ -58,13 +59,14 @@ export class Viewport {
     if(this.runtime){const camera=this.runtime.objects.find(o=>o.camera);if(camera){const target=this.runtime.objects.find(o=>o.id===camera.camera.followTarget);return {x:target?.transform.x??camera.transform.x,y:target?.transform.y??camera.transform.y,zoom:camera.camera.zoom};}}
     return {x:p.scene.width/2-this.pan.x,y:p.scene.height/2-this.pan.y,zoom:this.zoom};
   }
-  metrics(){const scene=this.project?.scene||{width:960,height:540},cam=this.camera();const scale=Math.max(.03,Math.min((this.width-60)/scene.width,(this.height-54)/scene.height))*cam.zoom;return {scale,cam,ox:this.width/2-cam.x*scale,oy:this.height/2-cam.y*scale};}
+  metrics(){const scene=this.project?.scene||{width:960,height:540},cam={...this.camera()};const shake=this.effectsEnabled?(this.runtime?.effects?.shake||0):0;cam.x+=Math.sin(this.time*157)*shake;cam.y+=Math.cos(this.time*131)*shake;const scale=Math.max(.03,Math.min((this.width-60)/scene.width,(this.height-54)/scene.height))*cam.zoom;return {scale,cam,ox:this.width/2-cam.x*scale,oy:this.height/2-cam.y*scale};}
   toWorld(clientX,clientY){const r=this.canvas.getBoundingClientRect(),m=this.metrics();return {x:(clientX-r.left-m.ox)/m.scale,y:(clientY-r.top-m.oy)/m.scale};}
   hit(p){
     if(!this.project)return null;
     return [...this.project.objects].filter(o=>o.active).sort((a,b)=>(b.sprite?.layer||0)-(a.sprite?.layer||0)||this.project.objects.indexOf(b)-this.project.objects.indexOf(a)).find(o=>{
       const t=o.transform,angle=-t.rotation*Math.PI/180,dx=p.x-t.x,dy=p.y-t.y;
       const x=(dx*Math.cos(angle)-dy*Math.sin(angle))/t.scaleX,y=(dx*Math.sin(angle)+dy*Math.cos(angle))/t.scaleY;
+      if(o.rig&&[...rigPose(o.rig).values()].some(b=>{const dx=b.endX-b.x,dy=b.endY-b.y,t=Math.max(0,Math.min(1,((x-b.x)*dx+(y-b.y)*dy)/(dx*dx+dy*dy)));return Math.hypot(x-b.x-t*dx,y-b.y-t*dy)<8;}))return true;
       return Math.abs(x)<(o.sprite?.width||32)/2+5&&Math.abs(y)<(o.sprite?.height||28)/2+5;
     });
   }
@@ -102,12 +104,14 @@ export class Viewport {
     const objects=this.runtime?.objects||p.objects;
     for(const o of [...objects].filter(o=>o.active!==false).sort((a,b)=>(a.sprite?.layer||0)-(b.sprite?.layer||0))){
       const t=o.transform;ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.rotation*Math.PI/180);ctx.scale(t.scaleX,t.scaleY);
-      if(o.sprite?.visible!==false&&o.sprite)drawSprite(ctx,o.sprite,this.runtime?this.time:0,this.images);
+      if(o.sprite?.visible!==false&&o.sprite&&!o.rig?.hideSprite)drawSprite(ctx,o.sprite,this.runtime?this.time:0,this.images);
+      if(o.rig)drawRig(ctx,o.rig,o.animation);
       if(o.camera&&!this.runtime){ctx.strokeStyle=o.id===this.selected?'#c5ed8a':'#9aafb355';ctx.lineWidth=1.5/scale;ctx.strokeRect(-14,-10,22,20);ctx.beginPath();ctx.moveTo(8,-5);ctx.lineTo(17,-10);ctx.lineTo(17,10);ctx.lineTo(8,5);ctx.stroke();}
       if(this.colliders&&o.collider&&!this.runtime){const c=o.collider;ctx.save();ctx.translate(c.offsetX,c.offsetY);ctx.strokeStyle=c.isTrigger?'#d7a6ff':'#c5ed8a';ctx.lineWidth=1/scale;ctx.setLineDash([4/scale,3/scale]);if(c.type==='circle'){ctx.beginPath();ctx.arc(0,0,c.radius,0,TAU);ctx.stroke();}else ctx.strokeRect(-c.width/2,-c.height/2,c.width,c.height);ctx.restore();}
       if(o.id===this.selected&&!this.runtime){const sw=(o.sprite?.width||34)+8,sh=(o.sprite?.height||28)+8;ctx.strokeStyle='#c5ed8a';ctx.fillStyle='#c5ed8a12';ctx.lineWidth=1/scale;ctx.fillRect(-sw/2,-sh/2,sw,sh);ctx.strokeRect(-sw/2,-sh/2,sw,sh);ctx.fillStyle='#d5f1ac';for(const [x,y]of [[-sw/2,-sh/2],[sw/2,-sh/2],[-sw/2,sh/2],[sw/2,sh/2]])ctx.fillRect(x-2/scale,y-2/scale,4/scale,4/scale);}
       ctx.restore();
     }
+    if(this.effectsEnabled)for(const effect of this.runtime?.effects?.particles||[]){ctx.globalAlpha=effect.alpha;ctx.fillStyle=effect.color;ctx.beginPath();ctx.arc(effect.x,effect.y,2,0,TAU);ctx.fill();}ctx.globalAlpha=1;
     const selected=p.objects.find(o=>o.id===this.selected);
     if(selected&&!this.runtime){const t=selected.transform,top=t.y-(selected.sprite?.height||28)*Math.abs(t.scaleY)/2-18/scale;ctx.font=`${11/scale}px system-ui`;const tw=ctx.measureText(selected.name).width;ctx.fillStyle='#171c19';ctx.fillRect(t.x-tw/2-7/scale,top-11/scale,tw+14/scale,19/scale);ctx.fillStyle='#d5f1ac';ctx.textAlign='center';ctx.fillText(selected.name,t.x,top+2/scale);}
     ctx.restore();

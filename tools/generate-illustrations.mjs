@@ -1,3 +1,4 @@
+import {animationLessons,animationVisuals} from '../src/course-animation.js';
 import {nextLessons,nextVisuals} from '../src/course-next.js';
 import fs from 'node:fs';
 const dir='public/lessons';fs.mkdirSync(dir,{recursive:true});
@@ -30,4 +31,4 @@ const files=[
 files.forEach(([file,name,body],i)=>fs.writeFileSync(`${dir}/${file}`,wrap(i+1,name,body),'utf8'));
 console.log(`Created ${files.length} offline SVG lesson illustrations.`);
 
-nextLessons.forEach((lesson,i)=>{const v=nextVisuals[i];const body=v.flow.map((step,n)=>rect(35+n*305,105,280,160,c.white,c.line)+text(55+n*305,145,String(n+1),24,c.green,650)+text(55+n*305,205,step,17,c.ink,600)).join('')+foot(v.answer);fs.writeFileSync(`${dir}/${v.file}`,wrap(i+11,lesson.title,body),'utf8');});
+[...nextLessons,...animationLessons].forEach((lesson,i)=>{const v=[...nextVisuals,...animationVisuals][i];const body=v.flow.map((step,n)=>rect(35+n*305,105,280,160,c.white,c.line)+text(55+n*305,145,String(n+1),24,c.green,650)+text(55+n*305,205,step,17,c.ink,600)).join('')+foot(v.answer);fs.writeFileSync(`${dir}/${v.file}`,wrap(i+11,lesson.title,body),'utf8');});

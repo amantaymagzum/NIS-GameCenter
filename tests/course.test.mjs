@@ -41,7 +41,7 @@ test('lesson 9 missing component produces a useful warning instead of an excepti
   const {runtime:r,events}=exampleRuntime(8,'sprite');r.tick();assert.ok(events.some(e=>e.level==='warn'&&e.message.includes('нет Rigidbody2D')));assert.ok(!events.some(e=>e.level==='error'));
 });
 test('downloaded student course includes complete source code and final project criteria',()=>{
-  const markdown=courseMarkdown();assert.equal(LESSON_COUNT,16);assert.ok(markdown.startsWith('# NIS-GameCenter'));
+  const markdown=courseMarkdown();assert.equal(LESSON_COUNT,19);assert.ok(markdown.startsWith('# NIS-GameCenter'));
   for(const lesson of lessons){assert.ok(markdown.includes(lesson.task));if(lesson.code)assert.ok(markdown.includes(lesson.code.source));}
   assert.ok(markdown.includes(lessons.at(-1).checks.at(-1)));
   assert.ok(!markdown.includes('undefined'));
